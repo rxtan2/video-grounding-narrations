@@ -9,3 +9,8 @@ This repository contains a PyTorch implementation of the paper [Look at What Iâ€
          title={Look at What Iâ€™m Doing: Self-Supervised Spatial Grounding of Narrations in Instructional Videos},
          booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
          year={2021} }
+
+# Dependencies
+
+1. Python 3.6
+2. Pytorch version 1.7.0
