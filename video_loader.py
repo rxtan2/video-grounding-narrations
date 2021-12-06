@@ -94,6 +94,45 @@ class HT100M_DataLoader(Dataset):
         for i in range(size):
             offsets.append(offsets[i]+struct.unpack_from('<Q', sizes, 8*i)[0])
         return offsets
+        
+    def _get_video(self, video_path, start, end):
+        start_seek = random.randint(start, int(max(start, end - self.num_sec)))
+        cmd = (
+            ffmpeg
+            .input(video_path, ss=start_seek, t=self.num_sec + 0.1)
+            .filter('fps', fps=self.fps)
+        )
+        if self.center_crop:
+            aw, ah = 0.5, 0.5
+        else:
+            aw, ah = random.uniform(0, 1), random.uniform(0, 1)
+        if self.crop_only:
+            cmd = (
+                cmd.crop('(iw - {})*{}'.format(self.size, aw),
+                         '(ih - {})*{}'.format(self.size, ah),
+                         str(self.size), str(self.size))
+            )
+        else:
+            cmd = (
+                cmd.crop('(iw - min(iw,ih))*{}'.format(aw),
+                         '(ih - min(iw,ih))*{}'.format(ah),
+                         'min(iw,ih)',
+                         'min(iw,ih)')
+                .filter('scale', self.size, self.size)
+            )
+        if self.random_flip and random.uniform(0, 1) > 0.5:
+            cmd = cmd.hflip()
+        out, _ = (
+            cmd.output('pipe:', format='rawvideo', pix_fmt='rgb24')
+            .run(capture_stdout=True, quiet=True)
+        )
+        video = np.frombuffer(out, np.uint8).reshape([-1, self.size, self.size, 3])
+        video = th.from_numpy(video)
+        video = video.permute(3, 0, 1, 2)
+        if video.shape[1] < self.num_frames:
+            zeros = th.zeros((3, self.num_frames - video.shape[1], self.size, self.size), dtype=th.uint8)
+            video = th.cat((video, zeros), axis=1)
+        return video[:, :self.num_frames]
 
     def parse_bcf(self, video, start, end, fps):
         f = open(video, 'rb')
@@ -172,14 +211,14 @@ class HT100M_DataLoader(Dataset):
         
         video_file = clip[-1].strip()     
         fps = self.vid_fps[video_file]
-    
-        video_path = os.path.join(self.video_root, video_file + '.bcf')
         text, start, end, word_idx, num_words = self._get_text(video_file, os.path.join(self.caption_root, video_file + '.csv'), clip[0], word)
         
-        if word_idx >= self.max_words:
-            word_idx = 0
-        
-        video = self.parse_bcf(video_path, start, end, int(fps))
+        if self.video_format == 'bcf':
+            video_path = os.path.join(self.video_root, video_file + '.bcf')
+            video = self.parse_bcf(video_path, start, end, int(fps))
+        else:
+            video_path = os.path.join(self.video_root, video_file + '.mp4')
+            video = self._get_video(video_path, start, end)
         
         mask = th.zeros((self.max_words), dtype=th.bool)
         mask[:num_words] = True
