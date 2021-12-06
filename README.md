@@ -20,3 +20,11 @@ This repository contains a PyTorch implementation of the paper [Look at What Iâ€
 The code is currently getting cleaned up and tested. It will be released very soon! Thank you for your patience.
 
 # Download YouCook2-Interactions Dataset
+
+# Preprocess videos into bytestream files
+
+# Training code
+
+# Evaluation code
+
+# Code credit
