@@ -55,7 +55,7 @@ def get_video_frames(video_path):
 def main():
     args = parser.parse_args()
     
-    original_annotations = json.load(open(args.youcook2_trainval_annotations_path))['database']
+    #original_annotations = json.load(open(args.youcook2_trainval_annotations_path))['database']
     interactions_annotations = pickle.load(open(args.annotations_path, "rb"))
     interactions_segments = pickle.load(open(args.segments_path, "rb"))
     colors = (255, 0 , 0)
@@ -77,12 +77,11 @@ def main():
             
         video_frames = get_video_frames(video_path)
         
-        text = None
+        '''text = None
         for tmp in curr_orig_anns:
             if tmp['segment'][0] == start:
-                text = tmp['sentence']
-                
-        #print('text: ', text)
+                text = tmp['sentence']  
+        print('text: ', text)'''
         
         for frame_id in curr_loc_anns:
             frame_ann = curr_loc_anns[frame_id]

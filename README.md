@@ -14,6 +14,8 @@ This repository contains a PyTorch implementation of the paper [Look at What Iâ€
 
 1. Python 3.6
 2. Pytorch version 1.7.0
+3. Ffmpeg
+4. Open-CV
 
 
 # Project Code Files
@@ -21,7 +23,16 @@ The code is currently getting cleaned up and tested. It will be released very so
 
 # Download YouCook2-Interactions Dataset
 
-# Preprocess videos into bytestream files
+Please go to this [link](https://drive.google.com/file/d/123HrerGvNZZO9GosvhccaqMw6lAl5L0u/view?usp=sharing) to download the YouCook2-Interactions evaluation dataset and unzip it. The output folder has the following files:
+
+1. final_dataset_segments.pkl - this file contains all the video segments that are used for evaluation. Each segment is represented by a tuple where its elements are the video name and start and end times in seconds.
+2. final_dataset_annotations.pkl - this file contains the frame-level bounding box annotations for the video segments.
+
+If you are interested in visualizing the YouCook2-Interactions dataset, you can do so by running the following command:
+
+`python plot_local_annotations.py --video_dir {directory where YouCook2 videos are stored} --annotations_path {path to final_dataset_annotations.pkl} --segments_path {path to final_dataset_segments.pkl} --output_dir {directory to store annotated frames}`
+
+# Preprocess videos into bytestream files (optional)
 
 # Training code
 
