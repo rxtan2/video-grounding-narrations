@@ -39,6 +39,8 @@ def get_args(description='MILNCE'):
         help='checkpoint model folder')
     parser.add_argument(
         '--optimizer', type=str, default='adam', help='opt algorithm')
+    parser.add_argument('--pretrained_path', type=str, default='./s3d_howto100m.pth',
+                                help='CNN weights inits')
     parser.add_argument('--weight_init', type=str, default='uniform',
                                 help='CNN weights inits')
     parser.add_argument('--num_thread_reader', type=int, default=20,
@@ -47,7 +49,7 @@ def get_args(description='MILNCE'):
                                 help='upper epoch limit')
     parser.add_argument('--num_candidates', type=int, default=1,
                                 help='num candidates for MILNCE loss')
-    parser.add_argument('--batch_size', type=int, default=256,
+    parser.add_argument('--batch_size', type=int, default=512,
                                 help='batch size')
     parser.add_argument('--num_windows_test', type=int, default=4,
                                 help='number of testing windows')
@@ -74,10 +76,7 @@ def get_args(description='MILNCE'):
     parser.add_argument('--min_time', type=float, default=5.0,
                                 help='')
     parser.add_argument(
-        '--pretrain_cnn_path',
-        type=str,
-        default='',
-        help='')
+        '--dist_url', type=str, default='tcp://localhost:23456', help='')
     parser.add_argument(
         '--word2vec_path', type=str, default='data/word2vec.pth', help='')
     parser.add_argument('--fps', type=int, default=5, help='')
@@ -101,7 +100,7 @@ def get_args(description='MILNCE'):
                         help='use pin_memory')
     parser.add_argument('--world-size', default=-1, type=int,
                         help='number of nodes for distributed training')
-    parser.add_argument('--rank', default=-1, type=int,
+    parser.add_argument('--rank', default=0, type=int,
                         help='node rank for distributed training')
     parser.add_argument('--dist-file', default='dist-file', type=str,
                         help='url used to set up distributed training')
