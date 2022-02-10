@@ -145,7 +145,7 @@ class HT100M_DataLoader(Dataset):
         frames = th.cat(frames, dim=0)
         frames = frames.permute(3, 0, 1, 2)
         if frames.shape[1] < self.num_frames:
-            zeros = th.zeros((3, self.num_frames - frames.shape[1], 128, 128), dtype=th.uint8)
+            zeros = th.zeros((3, self.num_frames - frames.shape[1], self.size, self.size), dtype=th.uint8)
             frames = th.cat((frames, zeros), axis=1)
         f.close()
         
@@ -213,4 +213,4 @@ class HT100M_DataLoader(Dataset):
             video_path = os.path.join(self.video_root, video_file + '.mp4')
             video = self._get_video(video_path, start, end)
         
-        return {'video': video, 'text': text, 'idx': word_idx, 'mask': mask,}
+        return {'video': video, 'text': text, 'mask': mask,}
