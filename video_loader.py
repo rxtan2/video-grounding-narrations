@@ -57,24 +57,17 @@ class HT100M_DataLoader(Dataset):
         self.num_candidates = 1
         self.random_flip = random_left_right_flip
         
-        f = open(self.caption_root, 'video_fps.txt', 'r')
-        self.vid_fps = {}
-        for i, vid in enumerate(f):
-            vid = vid.strip()
-            vid = vid.split(',')
-            self.vid_fps[vid[0]] = float(vid[-1])
-
-        self.all_vids = list(pickle.load(open(os.path.join(self.caption_root, 'training_clips.pkl'), 'rb')))
+        self.all_vids = list(pickle.load(open('./data/training_clips.pkl', 'rb')))
 
     def __len__(self):
         return len(self.all_vids)
 
-    def _get_text(self, video_file, caption, start, word_cap):
+    def _get_text(self, video_file, caption, start):
         cap = pd.read_csv(caption)        
         narr_ind = int(cap[cap['start'] == start].index.values[0])
         
         if self.num_candidates == 1:
-            words, idx, num_words = self.words_to_ids(cap['text'].values[narr_ind])
+            words, num_words = self.words_to_ids(cap['text'].values[narr_ind])
         else:
             words = th.zeros(self.num_candidates, self.max_words, dtype=th.long)
             cap_start = self._find_nearest_candidates(cap, ind)
@@ -87,7 +80,7 @@ class HT100M_DataLoader(Dataset):
             start = max(0, start - diff / 2)
             end = start + self.min_time 
             
-        return words, int(start), int(end), idx, num_words
+        return words, int(start), int(end), num_words
 
     def compute_offset(self, size, sizes):
         offsets = [0]
@@ -171,11 +164,10 @@ class HT100M_DataLoader(Dataset):
             return th.zeros(self.max_words, dtype=th.long)
         
     def _words_to_token(self, words):
-        idx = 0
         words = [self.word_to_token[word] for word in words if word in self.word_to_token]
         if words:
             we = self._zero_pad_tensor_token(th.LongTensor(words), self.max_words)
-            return we, idx, len(words)
+            return we, len(words)
         else:
             return th.zeros(self.max_words, dtype=th.long), 1, 1
 
@@ -207,20 +199,18 @@ class HT100M_DataLoader(Dataset):
 
     def __getitem__(self, idx):
         clip = self.all_vids[idx]
-        word = clip[-2]
         
         video_file = clip[-1].strip()     
-        fps = self.vid_fps[video_file]
-        text, start, end, word_idx, num_words = self._get_text(video_file, os.path.join(self.caption_root, video_file + '.csv'), clip[0], word)
-        
-        if self.video_format == 'bcf':
-            video_path = os.path.join(self.video_root, video_file + '.bcf')
-            video = self.parse_bcf(video_path, start, end, int(fps))
-        else:
-            video_path = os.path.join(self.video_root, video_file + '.mp4')
-            video = self._get_video(video_path, start, end)
+        text, start, end, num_words = self._get_text(video_file, os.path.join(self.caption_root, video_file + '.csv'), clip[0])
         
         mask = th.zeros((self.max_words), dtype=th.bool)
         mask[:num_words] = True
+        
+        if self.video_format == 'bcf':
+            video_path = os.path.join(self.video_root, video_file + '.bcf')
+            video = self.parse_bcf(video_path, start, end, self.fps)
+        else:
+            video_path = os.path.join(self.video_root, video_file + '.mp4')
+            video = self._get_video(video_path, start, end)
         
         return {'video': video, 'text': text, 'idx': word_idx, 'mask': mask,}
