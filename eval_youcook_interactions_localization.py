@@ -67,18 +67,12 @@ def main():
     print("=> loading checkpoint '{}'".format(args.checkpoint_eval))
     checkpoint = torch.load(args.checkpoint_eval)
     
-    if "state_dict" in checkpoint:
-        model = s3dg.S3D(
+    model = s3dg.S3D(
             args.num_class, space_to_depth=True, word2vec_path=args.word2vec_path)
         
-        model = torch.nn.DataParallel(model)
-        #model.load_state_dict(checkpoint["state_dict"])
-    else: # load pre-trained model from https://github.com/antoine77340/S3D_HowTo100M
-        model = s3dg.S3D(
-            args.num_class, space_to_depth=True, word2vec_path=args.word2vec_path)
-        model = torch.nn.DataParallel(model)
-        checkpoint_module = {'module.' + k:v for k,v in checkpoint.items()}
-        model.load_state_dict(checkpoint_module)
+    model = torch.nn.DataParallel(model)
+    model.load_state_dict(checkpoint["state_dict"])
+        
     model.eval()
     model.cuda()
    
