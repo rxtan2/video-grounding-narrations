@@ -10,17 +10,22 @@ def get_args(description='MILNCE'):
     parser.add_argument(
         '--video_path',
         type=str,
-        default='',
+        default='./dataset/videos',
         help='video_path')
     parser.add_argument(
         '--caption_root',
         type=str,
-        default='',
+        default='./howto100m_csv/',
         help='video_path')
     parser.add_argument(
         '--checkpoint_root',
         type=str,
         default='checkpoint',
+        help='checkpoint dir root')
+    parser.add_argument(
+        '--checkpoint_eval',
+        type=str,
+        default='./pretrained_checkpoints/epoch0005.pth.tar',
         help='checkpoint dir root')
     parser.add_argument(
         '--log_root',
@@ -30,13 +35,28 @@ def get_args(description='MILNCE'):
     parser.add_argument(
         '--eval_video_root',
         type=str,
-        default='',
+        default='/scratch2/youcook2_code/raw_videos/validation_videos/',
         help='root folder for the video at for evaluation')
     parser.add_argument(
         '--checkpoint_dir',
         type=str,
         default='',
         help='checkpoint model folder')
+    parser.add_argument(
+        '--youcook2_annotations_path',
+        type=str,
+        default="/research/rxtan/neurips_rebuttal/pretrained_s3d_baseline/youcookii_annotations_trainval.json",
+        help='path to original youcook2 instructions')
+    parser.add_argument(
+        '--interactions_annotations_path',
+        type=str,
+        default="/research/rxtan/neurips_rebuttal/reuben/final_dataset_annotations.pkl",
+        help='path to youcook2-interaction annotations')
+    parser.add_argument(
+        '--interactions_segments_path',
+        type=str,
+        default="/research/rxtan/neurips_rebuttal/reuben/final_dataset_segments.pkl",
+        help='path to youcook2-interaction segments')
     parser.add_argument(
         '--optimizer', type=str, default='adam', help='opt algorithm')
     parser.add_argument('--pretrained_path', type=str, default='./s3d_howto100m.pth',

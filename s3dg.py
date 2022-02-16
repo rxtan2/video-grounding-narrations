@@ -222,8 +222,8 @@ class CAEncoder(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         
     def forward(self, video_embd, text_embd, mask):
-        video_embd_att, text_embd_att = cross_attention(video_embd, text_embd, mask)
-        return video_embd_att, text_embd_att
+        video_embd_att, text_embd_att, vis_scores, text_scores = cross_attention(video_embd, text_embd, mask, self.training)
+        return video_embd_att, text_embd_att, vis_scores, text_scores
     
 class SAEncoder(nn.Module):
     def __init__(self, dim=512, hidden_dim=512, num_heads=1):
@@ -235,36 +235,70 @@ class SAEncoder(nn.Module):
         self.text_attn_mat = nn.MultiheadAttention(self.dim, self.num_heads)
         
     def forward(self, video_embd, text_embd, mask):
-        video_size = video_embd.size()
-        text_size = text_embd.size()
+        if self.training:
+            video_size = video_embd.size()
+            text_size = text_embd.size()
         
-        video_embd = video_embd.view(-1, video_embd.size(-2), video_embd.size(-1))
-        text_embd = text_embd.view(-1, text_embd.size(-2), text_embd.size(-1))
+            video_embd = video_embd.view(-1, video_embd.size(-2), video_embd.size(-1))
+            text_embd = text_embd.view(-1, text_embd.size(-2), text_embd.size(-1))
         
-        num_samples = mask.size(0)
-        mask = mask.unsqueeze(0).repeat(num_samples, 1, 1)
-        mask = mask.view(-1, mask.size(-1))
+            num_samples = mask.size(0)
+            mask = mask.unsqueeze(0).repeat(num_samples, 1, 1)
+            mask = mask.view(-1, mask.size(-1))
         
-        tmp_video_embd = video_embd.permute(1, 0, 2)
-        video_embd_att = self.vis_attn_mat(tmp_video_embd, tmp_video_embd, tmp_video_embd)[0]
-        video_embd_att = video_embd_att.permute(1, 0, 2)
+            tmp_video_embd = video_embd.permute(1, 0, 2)
+            video_embd_att, vis_attn_scores = self.vis_attn_mat(tmp_video_embd, tmp_video_embd, tmp_video_embd)
+            video_embd_att = video_embd_att.permute(1, 0, 2)
         
-        tmp_text_embd = text_embd.permute(1, 0, 2)
-        text_embd_att = self.text_attn_mat(tmp_text_embd, tmp_text_embd, tmp_text_embd, key_padding_mask=~mask)[0]
-        text_embd_att  = text_embd_att.permute(1, 0, 2)
+            tmp_text_embd = text_embd.permute(1, 0, 2)
+            text_embd_att, text_attn_scores = self.text_attn_mat(tmp_text_embd, tmp_text_embd, tmp_text_embd, key_padding_mask=~mask)
+            text_embd_att  = text_embd_att.permute(1, 0, 2)
         
-        # Residual Connection
-        video_embd_att = video_embd_att + video_embd
-        text_embd_att = text_embd_att + text_embd
+            # Residual Connection
+            video_embd_att = video_embd_att + video_embd
+            text_embd_att = text_embd_att + text_embd
         
-        video_embd_att = video_embd_att.view(video_size)
-        text_embd_att = text_embd_att.view(text_size)
+            video_embd_att = video_embd_att.view(video_size)
+            text_embd_att = text_embd_att.view(text_size)
         
-        return video_embd_att, text_embd_att
+        else:
+            num_samples = video_embd.size(0)
+            mask = mask.unsqueeze(0).repeat(num_samples, 1, 1)
+            mask = mask.view(-1, mask.size(-1))
+        
+            tmp_video_embd = video_embd.permute(1, 0, 2)
+            video_embd_att, vis_attn_scores = self.vis_attn_mat(tmp_video_embd, tmp_video_embd, tmp_video_embd)
+            video_embd_att = video_embd_att.permute(1, 0, 2)
+        
+            tmp_text_embd = text_embd.permute(1, 0, 2)     
+            text_embd_att, text_attn_scores = self.text_attn_mat(tmp_text_embd, tmp_text_embd, tmp_text_embd, key_padding_mask=~mask)
+            text_embd_att  = text_embd_att.permute(1, 0, 2)
+        
+            # Residual Connection
+            video_embd_att = video_embd_att + video_embd
+            text_embd_att = text_embd_att + text_embd
+        
+        return video_embd_att, text_embd_att, vis_attn_scores, text_attn_scores
     
-def cross_attention(video_embd, text_embd, mask):
+def cross_attention(video_embd, text_embd, mask, train=True):
     softmax = nn.Softmax(dim=-1)
     num_samples = len(video_embd)
+    if not train:
+        scores = th.bmm(video_embd, text_embd.permute(0, 2, 1))
+        lang_mask = mask.unsqueeze(1).repeat(1, video_embd.size(-2), 1)
+        vis_att_scores = scores.masked_fill(lang_mask==False, -float('inf'))
+        vis_att_scores = softmax(vis_att_scores)
+        video_embd_att = text_embd.unsqueeze(1).repeat(1, video_embd.size(-2), 1, 1)
+        video_embd_att = video_embd_att * vis_att_scores.unsqueeze(-1)
+        video_embd_att = video_embd_att.sum(-2)
+        
+        text_att_scores = scores.permute(0, 2, 1)
+        text_att_scores = softmax(text_att_scores)
+        text_embd_att = video_embd.unsqueeze(1).repeat(1, text_embd.size(-2), 1, 1)
+        text_embd_att = text_embd_att * text_att_scores.unsqueeze(-1)
+        text_embd_att = text_embd_att.sum(-2)
+        
+        return video_embd_att, text_embd_att, vis_att_scores, text_att_scores
     if len(video_embd.size()) == 3:
         scores = text_embd.view(-1, text_embd.size(-1))
         scores = th.matmul(video_embd, scores.t())
@@ -292,7 +326,7 @@ def cross_attention(video_embd, text_embd, mask):
         video_embd = video_embd.unsqueeze(1).repeat(1, num_samples, 1, 1)
         text_embd = text_embd.unsqueeze(0).repeat(num_samples, 1, 1, 1)
         
-        return video_embd_att, text_embd_att
+        return video_embd_att, text_embd_att, vis_att_scores, text_att_scores
     else:
         scores = th.matmul(video_embd, text_embd.permute(0, 1, 3, 2))
         scores = scores / th.sqrt(th.tensor(video_embd.size(-1)).float())
@@ -314,7 +348,7 @@ def cross_attention(video_embd, text_embd, mask):
         video_embd_att = video_embd_att + video_embd
         text_embd_att = text_embd_att + text_embd
         
-        return video_embd_att, text_embd_att
+        return video_embd_att, text_embd_att, vis_att_scores, text_att_scores
 
 class S3D(nn.Module):
 
@@ -393,9 +427,9 @@ class S3D(nn.Module):
           video_embd = th.flatten(video_embd, start_dim=1, end_dim=-2)
           video_embd = self.vis_proj_mat(video_embd)
 
-          video_embd_att, text_embd_att = self.ca_layer1(video_embd, text_embd, mask)
-          video_embd_att, text_embd_att = self.sa_layer(video_embd_att, text_embd_att, mask)
-          final_video_embd_att, final_text_embd_att = self.ca_layer2(video_embd_att, text_embd_att, mask)
+          video_embd_att, text_embd_att, _, _ = self.ca_layer1(video_embd, text_embd, mask)
+          video_embd_att, text_embd_att, _, _ = self.sa_layer(video_embd_att, text_embd_att, mask)
+          final_video_embd_att, final_text_embd_att, _, _ = self.ca_layer2(video_embd_att, text_embd_att, mask)
             
           # Computes loss
           mask = mask.unsqueeze(0).repeat(num_samples, 1, 1)
@@ -405,6 +439,32 @@ class S3D(nn.Module):
           final_video_embd_att = final_video_embd_att.mean(-2)
           
           return final_video_embd_att, final_text_embd_att
+      elif mode == 'eval':
+          text_embd = self.text_module(text, mask)
+          video_embd = self.forward_video(video)
+          num_temporal_steps = video_embd.size(1)
+          video_embd = th.flatten(video_embd, start_dim=1, end_dim=-2)
+          num_regions = video_embd.size(1)
+          text_embd = self.lang_proj_mat(text_embd)
+          num_words = text_embd.size(1)
+          video_embd =  self.vis_proj_mat(video_embd)
+        
+          text_embd = text_embd.repeat(len(video_embd), 1, 1)
+          video_embd_att, text_embd_att, vis_scores, text_scores = self.ca_layer1(video_embd, text_embd, mask)
+          video_embd_att, text_embd_att, sa_vis_scores, sa_text_scores = self.sa_layer(video_embd_att, text_embd_att, mask)
+          final_video_embd_att, final_text_embd_att, vis_scores2, text_scores2 = self.ca_layer2(video_embd_att, text_embd_att, mask)
+          mask = mask.repeat(len(video_embd), 1) 
+          vis_scores2 = vis_scores2.masked_fill(mask.unsqueeze(1).repeat(1, vis_scores2.size(1), 1)==False, 0.)
+          sa_text_scores = sa_text_scores.masked_fill(mask.unsqueeze(1).repeat(1, sa_text_scores.size(1), 1)==False, 0.)
+          text_scores = text_scores.masked_fill(mask.unsqueeze(-1).repeat(1, 1, text_scores.size(-1))==False, 0.)
+          text_scores2 = text_scores2.masked_fill(mask.unsqueeze(-1).repeat(1, 1, text_scores.size(-1))==False, 0.)
+          
+          result = th.bmm(vis_scores2, sa_text_scores)
+          result = th.bmm(result, text_scores)
+          result = result.mean(1)
+          
+          return result
+          
       elif mode == 'video':
           return self.forward_video(video, mixed5c=mixed5c)
       elif mode == 'text':
