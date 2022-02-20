@@ -20,8 +20,6 @@ from video_loader import HT100M_DataLoader
 from loss import MILNCELoss
 import sys
 
-from metrics import compute_metrics
-from youcook_loader import Youcook_DataLoader
 from utils import AllGather
 from utils import get_cosine_schedule_with_warmup
 
@@ -36,9 +34,13 @@ def main():
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
+        
     
-    args.distributed = args.world_size > 1 or args.multiprocessing_distributed
     ngpus_per_node = torch.cuda.device_count()
+    args.world_size = ngpus_per_node
+    args.distributed = args.world_size > 1 or args.multiprocessing_distributed
+    args.dist_url = "tcp://localhost:23456"
+    args.rank = 0
 
     if args.multiprocessing_distributed:
         mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
@@ -197,10 +199,9 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, dataset, 
     if args.rank == 0:
         print('time elapsed: ' + str(total))
 
-def TrainOneBatch(model, opt, scheduler, data, loss_fun, args, scaler):
+def TrainOneBatch(model, opt, scheduler, data, loss_fun, args):
     video = data["video"].float().cuda(args.gpu, non_blocking=args.pin_memory)
     text = data["text"].cuda(args.gpu, non_blocking=args.pin_memory)
-    idx = data["idx"].cuda(args.gpu, non_blocking=args.pin_memory)
     mask = data["mask"].cuda(args.gpu, non_blocking=args.pin_memory)
     
     text = text.view(-1, text.shape[-1])
@@ -208,7 +209,7 @@ def TrainOneBatch(model, opt, scheduler, data, loss_fun, args, scaler):
     
     opt.zero_grad()
     with torch.set_grad_enabled(True):
-        video_embd, text_embd = model(video, text, idx, mask)        
+        video_embd, text_embd = model(video, text, mask)        
         loss = loss_fun(video_embd, text_embd)
     loss.backward()
     opt.step()
