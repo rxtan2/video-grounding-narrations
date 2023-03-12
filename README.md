@@ -36,6 +36,10 @@ If you are interested in visualizing the YouCook2-Interactions dataset, you can 
 
 # Training code
 
+To run the training code, please run the following command:
+
+`python main_distributed.py --batch_size 512 --lr 1e-4 --epochs 10 --multiprocessing-distributed --checkpoint_dir {path to directory for saving checkpoints}`
+
 # Evaluation code
 
 Before starting the evaluation, please download the original YouCook2 train and validation annotations [here](http://youcook2.eecs.umich.edu/static/YouCookII/youcookii_annotations_trainval.tar.gz). 
